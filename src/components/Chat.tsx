@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+
 import {
   collection,
   query,
@@ -9,7 +10,9 @@ import {
   limit,
   doc,
   updateDoc,
-  arrayUnion
+  arrayUnion,
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,10 +20,14 @@ import { Send } from 'lucide-react';
 
 import { db } from '../lib/firebase';
 
+// =========================================================
+// TYPES
+// =========================================================
+
 interface ChatProps {
   roomId: string;
   username: string;
-  userId: string;
+  userId?: string;
 }
 
 interface Message {
@@ -31,15 +38,24 @@ interface Message {
   timestamp: any;
 }
 
+// =========================================================
+// COMPONENT
+// =========================================================
+
 export default function Chat({
   roomId,
   username,
   userId
 }: ChatProps) {
 
+  // =========================================================
+  // STATE
+  // =========================================================
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // =========================================================
@@ -47,48 +63,135 @@ export default function Chat({
   // =========================================================
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth'
-    });
+
+    if (messagesEndRef.current) {
+
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end'
+      });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+
+    const timeout = setTimeout(() => {
+      scrollToBottom();
+    }, 100);
+
+    return () => clearTimeout(timeout);
+
   }, [messages]);
 
   // =========================================================
-  // JOIN ROOM AS MEMBER
+  // DEBUG
   // =========================================================
 
   useEffect(() => {
-    if (!roomId || !userId) return;
+
+    console.log('Chat Props:', {
+      roomId,
+      username,
+      userId
+    });
+
+  }, [roomId, username, userId]);
+
+  // =========================================================
+  // CREATE / JOIN ROOM
+  // =========================================================
+
+  useEffect(() => {
+
+    if (!roomId) return;
 
     const joinRoom = async () => {
+
       try {
-        const roomRef = doc(db, 'sessions', roomId);
 
-        await updateDoc(roomRef, {
-          members: arrayUnion(userId),
-          updatedAt: serverTimestamp()
-        });
+        const roomRef = doc(
+          db,
+          'sessions',
+          roomId
+        );
 
-        console.log('Joined room successfully');
+        const roomSnap = await getDoc(roomRef);
+
+        // =====================================================
+        // CREATE ROOM IF MISSING
+        // =====================================================
+
+        if (!roomSnap.exists()) {
+
+          await setDoc(roomRef, {
+
+            files: {},
+
+            activeFile: 'main.js',
+
+            canvas: [],
+
+            members: [
+              userId || 'anonymous'
+            ],
+
+            ownerId:
+              userId || 'anonymous',
+
+            updatedAt:
+              serverTimestamp()
+          });
+
+          console.log(
+            'Room created successfully'
+          );
+
+        } else {
+
+          // ===================================================
+          // JOIN EXISTING ROOM
+          // ===================================================
+
+          await updateDoc(roomRef, {
+
+            members: arrayUnion(
+              userId || 'anonymous'
+            ),
+
+            updatedAt:
+              serverTimestamp()
+          });
+
+          console.log(
+            'Joined existing room'
+          );
+        }
+
       } catch (error) {
-        console.error('Error joining room:', error);
+
+        console.error(
+          'Error joining room:',
+          error
+        );
       }
     };
 
     joinRoom();
+
   }, [roomId, userId]);
 
   // =========================================================
-  // REALTIME MESSAGES LISTENER
+  // REALTIME MESSAGES
   // =========================================================
 
   useEffect(() => {
+
     if (!roomId) return;
 
-    console.log('Listening to room:', roomId);
+    console.log(
+      'Listening to room:',
+      roomId
+    );
 
     const messagesRef = collection(
       db,
@@ -102,23 +205,37 @@ export default function Chat({
     );
 
     const unsubscribe = onSnapshot(
+
       q,
+
       (snapshot) => {
 
-        console.log('Messages count:', snapshot.docs.length);
+        console.log(
+          'Messages count:',
+          snapshot.docs.length
+        );
 
         const newMessages = snapshot.docs
           .map((doc) => ({
             id: doc.id,
             ...doc.data()
           }))
-          .filter((msg: any) => msg.timestamp);
+          .filter(
+            (msg: any) => msg.timestamp
+          );
 
-        console.log('Messages:', newMessages);
+        console.log(
+          'Realtime Messages:',
+          newMessages
+        );
 
-        setMessages(newMessages as Message[]);
+        setMessages(
+          newMessages as Message[]
+        );
       },
+
       (error) => {
+
         console.error(
           'Firestore Chat Error:',
           error
@@ -150,19 +267,29 @@ export default function Chat({
     try {
 
       await addDoc(
+
         collection(
           db,
           `sessions/${roomId}/messages`
         ),
+
         {
-          sender: username,
-          senderId: userId,
+          sender:
+            username || 'Anonymous',
+
+          senderId:
+            userId || 'anonymous',
+
           text,
-          timestamp: serverTimestamp()
+
+          timestamp:
+            serverTimestamp()
         }
       );
 
-      console.log('Message sent');
+      console.log(
+        'Message sent successfully'
+      );
 
     } catch (error) {
 
@@ -177,7 +304,9 @@ export default function Chat({
   // FORMAT TIME
   // =========================================================
 
-  const formatTime = (timestamp: any) => {
+  const formatTime = (
+    timestamp: any
+  ) => {
 
     if (!timestamp?.toDate) {
       return '...';
@@ -196,11 +325,12 @@ export default function Chat({
   // =========================================================
 
   return (
-    <div className="flex flex-col h-full bg-[#020617]/40 backdrop-blur-sm">
+
+    <div className="flex flex-col h-screen w-full bg-[#020617]/40 backdrop-blur-sm">
 
       {/* HEADER */}
 
-      <div className="p-4 border-b border-slate-800 bg-[#020617]/60">
+      <div className="p-4 border-b border-slate-800 bg-[#020617]/60 shrink-0">
 
         <h3 className="font-semibold text-sm uppercase tracking-widest text-slate-400">
           Live Chat
@@ -210,37 +340,59 @@ export default function Chat({
 
       {/* MESSAGES */}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        className="
+          flex-1
+          overflow-y-auto
+          overflow-x-hidden
+          p-4
+          space-y-4
+          scroll-smooth
+        "
+        style={{
+          maxHeight: '100%',
+          scrollbarWidth: 'thin'
+        }}
+      >
 
         <AnimatePresence initial={false}>
 
           {messages.map((msg) => {
 
             const isOwnMessage =
-              msg.senderId === userId;
+              msg.senderId ===
+              (userId || 'anonymous');
 
             return (
 
               <motion.div
                 key={msg.id}
+
                 initial={{
                   opacity: 0,
                   y: 10,
                   scale: 0.95
                 }}
+
                 animate={{
                   opacity: 1,
                   y: 0,
                   scale: 1
                 }}
+
                 transition={{
                   duration: 0.2
                 }}
-                className={`flex flex-col ${
-                  isOwnMessage
-                    ? 'items-end'
-                    : 'items-start'
-                }`}
+
+                className={`
+                  flex flex-col
+                  ${
+                    isOwnMessage
+                      ? 'items-end'
+                      : 'items-start'
+                  }
+                `}
               >
 
                 {/* USERNAME + TIME */}
@@ -267,6 +419,8 @@ export default function Chat({
                     rounded-2xl
                     text-sm
                     break-words
+                    whitespace-pre-wrap
+
                     ${
                       isOwnMessage
                         ? `
@@ -286,7 +440,9 @@ export default function Chat({
                     }
                   `}
                 >
+
                   {msg.text}
+
                 </div>
 
               </motion.div>
@@ -294,6 +450,8 @@ export default function Chat({
           })}
 
         </AnimatePresence>
+
+        {/* AUTO SCROLL TARGET */}
 
         <div ref={messagesEndRef} />
 
@@ -303,18 +461,22 @@ export default function Chat({
 
       <form
         onSubmit={handleSend}
-        className="p-4 border-t border-slate-800 bg-[#020617]/60"
+        className="p-4 border-t border-slate-800 bg-[#020617]/60 shrink-0"
       >
 
         <div className="relative">
 
           <input
             type="text"
+
             value={input}
+
             onChange={(e) =>
               setInput(e.target.value)
             }
+
             placeholder="Type a message..."
+
             className="
               w-full
               bg-slate-800
@@ -336,6 +498,7 @@ export default function Chat({
 
           <button
             type="submit"
+
             className="
               absolute
               right-2

@@ -21,7 +21,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.22.1",
     "firebase": "^12.12.1",
-    "firebase-admin": "^13.8.0",
+    "firebase-admin": "^13.10.0",
     "framer-motion": "^12.38.0",
     "fs-extra": "^11.3.4",
     "konva": "^10.3.0",

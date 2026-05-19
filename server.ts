@@ -27,20 +27,29 @@ const clientDb = getClientFirestore(clientApp);
 
 // Initialize Firebase Admin once
 if (!admin.apps.length) {
+
   try {
-    // Try native ADC first
-    admin.initializeApp();
-    console.log("[Firebase Admin] Initialized with default credentials");
+
+    import serviceAccount from "./serviceAccountKey.json";
+
+    admin.initializeApp({
+      credential: admin.credential.cert(
+        serviceAccount as admin.ServiceAccount
+      ),
+      projectId: firebaseConfig.projectId,
+    });
+
+    console.log(
+      "[Firebase Admin] Initialized Successfully:",
+      firebaseConfig.projectId
+    );
+
   } catch (error) {
-    // Fallback to explicit projectId
-    try {
-      admin.initializeApp({
-        projectId: firebaseConfig.projectId,
-      });
-      console.log("[Firebase Admin] Initialized with explicit projectId:", firebaseConfig.projectId);
-    } catch (e2) {
-      console.error("[Firebase Admin] Initialization failed completely:", e2);
-    }
+
+    console.error(
+      "[Firebase Admin] Initialization failed:",
+      error
+    );
   }
 }
 
