@@ -27,15 +27,8 @@ const clientDb = getClientFirestore(clientApp);
 
 // Initialize Firebase Admin once
 if (!admin.apps.length) {
-
   try {
-
-    import serviceAccount from "./serviceAccountKey.json";
-
     admin.initializeApp({
-      credential: admin.credential.cert(
-        serviceAccount as admin.ServiceAccount
-      ),
       projectId: firebaseConfig.projectId,
     });
 
@@ -43,9 +36,7 @@ if (!admin.apps.length) {
       "[Firebase Admin] Initialized Successfully:",
       firebaseConfig.projectId
     );
-
   } catch (error) {
-
     console.error(
       "[Firebase Admin] Initialization failed:",
       error
